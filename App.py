@@ -484,9 +484,7 @@ def main():
     st.info("Results accuracy depends on image quality and lighting") 
     st.info("For best results, capture images during daylight hours")
     
-    # Footer
-    st.markdown("---")
-    st.markdown("Made with AI & Deep Learning for farmers")
+
 
 if __name__ == "__main__":
     main()
