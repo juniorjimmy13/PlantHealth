@@ -176,4 +176,5 @@ print(f"Test Accuracy: {accuracy(test_loader):.4f}")
 
 # === 7. SAVE MODEL ===
 torch.save(model.state_dict(),"PM2.pt")
+torch.save(model, "PM2F.pt")
 print("Model saved as 'PM2.pt'")
