@@ -227,8 +227,6 @@ def predict_disease(model, image_tensor):
         
         original_predicted = predicted.item()
         
-        # Since we don't know the exact mapping, let's try different approaches
-        # Option 1: Direct mapping (if classes 0-38 are correct)
         if original_predicted < 39:
             final_class = original_predicted
         else:
@@ -345,7 +343,7 @@ def main():
             st.write(f"Debug: Original model output: {original_pred}, Mapped to class: {predicted_class}")
             
             # PyTorch ImageFolder sorts classes alphabetically by folder name
-            # This should match the order your model was trained on
+            # This should match the order our model was trained on
             class_names = [
                 "Apple_black_rot",           # 0
                 "Apple_cedar_apple_rust",    # 1  
