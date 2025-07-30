@@ -1,189 +1,179 @@
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 import torch
-from torchvision import datasets, transforms, models  # datsets  , transforms
-from torch.utils.data.sampler import SubsetRandomSampler
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data.sampler import SubsetRandomSampler
+from torchvision import datasets, transforms
 from datetime import datetime
+import os
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using device:", device)
 
+# === 2. IMAGE TRANSFORMS ===
 
-transform = transforms.Compose(
-    [transforms.Resize(255), transforms.CenterCrop(224), transforms.ToTensor()]
-)
+# ImageNet mean/std for normalization
+imagenet_mean = [0.485, 0.456, 0.406]
+imagenet_std = [0.229, 0.224, 0.225]
 
-train_dataset = datasets.ImageFolder("C:/Users/khush/Documents/Projects/Uni/Machine_Learning_Project/ML-Project/New Plant Diseases Dataset(Augmented)/train", transform=transform)
-valid_dataset = datasets.ImageFolder("C:/Users/khush/Documents/Projects/Uni/Machine_Learning_Project/ML-Project/New Plant Diseases Dataset(Augmented)/valid", transform=transform)
-test_dataset = datasets.ImageFolder("C:\Users\khush\Documents\Projects\Uni\Machine_Learning_Project\test", transform=transform)
+train_transform = transforms.Compose([
+    transforms.Resize((256, 256)),
+    transforms.RandomResizedCrop(224),
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomVerticalFlip(),
+    transforms.RandomRotation(20),
+    transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.05),
+    transforms.RandomGrayscale(p=0.1),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=imagenet_mean, std=imagenet_std)
+])
 
-train_indices = list(range(len(train_dataset)))
-validation_indices = list(range(len(valid_dataset)))
-test_indices = list(range(len(test_dataset)))
+test_transform = transforms.Compose([
+    transforms.Resize((256, 256)),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=imagenet_mean, std=imagenet_std)
+])
 
-train_sampler = SubsetRandomSampler(train_indices)
-validation_sampler = SubsetRandomSampler(validation_indices)
-test_sampler = SubsetRandomSampler(test_indices)
+# === 3. DATASET ===
 
-targets_size = len(train_dataset.class_to_idx)+len(valid_dataset.class_to_idx)
+train_path =    # need to redownload datasets
+valid_path =   # need to redownload datasets
+test_path =    # need to redownload datasets
 
+train_dataset = datasets.ImageFolder(train_path, transform=train_transform)
+valid_dataset = datasets.ImageFolder(valid_path, transform=test_transform)
+test_dataset = datasets.ImageFolder(test_path, transform=test_transform)
+
+batch_size = 64
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+validation_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+num_classes = len(train_dataset.classes)
+print(f"Detected {num_classes} classes.")
+
+# === 4. MODEL ===
 class CNN(nn.Module):
     def __init__(self, K):
         super(CNN, self).__init__()
         self.conv_layers = nn.Sequential(
-            # conv1
-            nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1),
+            nn.Conv2d(3, 32, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(32),
-            nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1),
+            nn.Conv2d(32, 32, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(32),
             nn.MaxPool2d(2),
-            # conv2
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1),
+
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(64),
-            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(64),
             nn.MaxPool2d(2),
-            # conv3
-            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
+
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(128),
-            nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1),
+            nn.Conv2d(128, 128, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(128),
             nn.MaxPool2d(2),
-            # conv4
-            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1),
+
+            nn.Conv2d(128, 256, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(256),
-            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, padding=1),
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(256),
             nn.MaxPool2d(2),
         )
+
+        with torch.no_grad():
+            dummy = torch.zeros(1, 3, 224, 224)
+            out = self.conv_layers(dummy)
+            self.flatten_size = out.view(1, -1).shape[1]
 
         self.dense_layers = nn.Sequential(
             nn.Dropout(0.4),
-            nn.Linear(50176, 1024),
+            nn.Linear(self.flatten_size, 1024),
             nn.ReLU(),
             nn.Dropout(0.4),
-            nn.Linear(1024, K),
+            nn.Linear(1024, K)
         )
 
-    def forward(self, X):
-        out = self.conv_layers(X)
+    def forward(self, x):
+        x = self.conv_layers(x)
+        x = torch.flatten(x, 1)
+        x = self.dense_layers(x)
+        return x
 
-        # Flatten
-        out = out.view(-1, 50176)
 
-        # Fully connected
-        out = self.dense_layers(out)
-
-        return out
-    
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(device)
-
-model = CNN(targets_size)
-
-model.to(device)
-
-criterion = nn.CrossEntropyLoss()  # this include softmax + cross entropy loss
+model = CNN(num_classes).to(device)
+criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters())
 
-def batch_gd(model, criterion, train_loader, test_loader, epochs):
-    #epochs = 500
+# === 5. TRAINING LOOP ===
+def train_model(model, criterion, train_loader, val_loader, epochs):
     train_losses = np.zeros(epochs)
-    validation_losses = np.zeros(epochs)
-    print(epochs)
-    for e in range(epochs):
+    val_losses = np.zeros(epochs)
+
+    for epoch in range(epochs):
         t0 = datetime.now()
-        train_loss = []
+        model.train()
+        running_loss = []
+
         for inputs, targets in train_loader:
-            print('hello')
             inputs, targets = inputs.to(device), targets.to(device)
-            print('hello1')
             optimizer.zero_grad()
-            print('hello2')
-            output = model(inputs)
-            print('hello3')
-            loss = criterion(output, targets)
-            print('hello4')
-            train_loss.append(loss.item())  # torch to numpy world
-            print('hello5')
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+            running_loss.append(loss.item())
             loss.backward()
             optimizer.step()
-        print('hello6')
-        train_loss = np.mean(train_loss)
 
-        validation_loss = []
+        train_losses[epoch] = np.mean(running_loss)
 
-        for inputs, targets in validation_loader:
-            print("hello next")
-            inputs, targets = inputs.to(device), targets.to(device)
+        model.eval()
+        val_loss = []
+        with torch.no_grad():
+            for inputs, targets in val_loader:
+                inputs, targets = inputs.to(device), targets.to(device)
+                outputs = model(inputs)
+                loss = criterion(outputs, targets)
+                val_loss.append(loss.item())
 
-            output = model(inputs)
-
-            loss = criterion(output, targets)
-
-            validation_loss.append(loss.item())  # torch to numpy world
-
-        validation_loss = np.mean(validation_loss)
-
-        train_losses[e] = train_loss
-        validation_losses[e] = validation_loss
-
+        val_losses[epoch] = np.mean(val_loss)
         dt = datetime.now() - t0
 
-        print(
-            f"Epoch : {e+1}/{epochs} Train_loss:{train_loss:.3f} Test_loss:{validation_loss:.3f} Duration:{dt}"
-        )
+        print(f"Epoch {epoch+1}/{epochs} | Train Loss: {train_losses[epoch]:.4f} | Val Loss: {val_losses[epoch]:.4f} | Time: {dt}")
 
-    return train_losses, validation_losses
+    return train_losses, val_losses
 
-batch_size = 64
-train_loader = torch.utils.data.DataLoader(
-    train_dataset, batch_size=batch_size, sampler=train_sampler
-)
-test_loader = torch.utils.data.DataLoader(
-     test_dataset, batch_size=batch_size, sampler=test_sampler
-)
 
-validation_loader = torch.utils.data.DataLoader(
-    valid_dataset, batch_size=batch_size, sampler=validation_sampler
-)
+train_losses, val_losses = train_model(model, criterion, train_loader, validation_loader, epochs=5)
 
-train_losses, validation_losses = batch_gd(
-    model, criterion, train_loader, validation_loader, 5
-)
-
+# === 6. ACCURACY ===
 def accuracy(loader):
+    model.eval()
     n_correct = 0
     n_total = 0
+    with torch.no_grad():
+        for inputs, targets in loader:
+            inputs, targets = inputs.to(device), targets.to(device)
+            outputs = model(inputs)
+            _, preds = torch.max(outputs, 1)
+            n_correct += (preds == targets).sum().item()
+            n_total += targets.size(0)
+    return n_correct / n_total
 
-    for inputs, targets in loader:
-        inputs, targets = inputs.to(device), targets.to(device)
 
-        outputs = model(inputs)
+print(f"Train Accuracy: {accuracy(train_loader):.4f}")
+print(f"Validation Accuracy: {accuracy(validation_loader):.4f}")
+print(f"Test Accuracy: {accuracy(test_loader):.4f}")
 
-        _, predictions = torch.max(outputs, 1)
-
-        n_correct += (predictions == targets).sum().item()
-        n_total += targets.shape[0]
-
-    acc = n_correct / n_total
-    return acc
-
-train_acc = accuracy(train_loader)
-test_acc = accuracy(test_loader)
-validation_acc = accuracy(validation_loader)
-
-print(
-    f"Train Accuracy : {train_acc}\nTest Accuracy : {test_acc}\nValidation Accuracy : {validation_acc}"
-)
-
-torch.save(model.state_dict() , 'plant_disease_model_2.pt')
+# === 7. SAVE MODEL ===
+torch.save(model.state_dict(),"PM2.pt")
+print("Model saved as 'PM2.pt'")
