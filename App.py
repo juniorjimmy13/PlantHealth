@@ -44,8 +44,8 @@ st.markdown("""
         }
         
         .tips-section {
-            background-color: #262730;
-            color: #fafafa;
+            background-color: black;
+            color: white;
         }
         
         .stSelectbox > div > div {
