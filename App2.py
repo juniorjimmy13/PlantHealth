@@ -114,17 +114,17 @@ def load_model():
     
     st.info("🔄 Loading model...")
     
-    # Strategy 1: Try with safe_globals (PyTorch 2.6+ secure method)
+    # Strategy 1: Try with safe_globals
     try:
         model = OptimizedCNN(NUM_CLASSES)
         with torch.serialization.safe_globals([OptimizedCNN]):
             if MODEL_PATH.endswith('tip.pt'):
                 # If it's a full model file
-                loaded_model = torch.load(MODEL_PATH, map_location='cpu')
+                loaded_model = torch.load(MODEL_PATH, map_location='cpu',weights_only=False)
                 if isinstance(loaded_model, nn.Module):
                     model = loaded_model
                 else:
-                    model.load_state_dict(loaded_model)
+                    model.load_state_dict(loaded_model,)
             else:
                 # If it's just state dict
                 state_dict = torch.load(MODEL_PATH, map_location='cpu')
@@ -140,7 +140,7 @@ def load_model():
         # Strategy 2: Try with weights_only=False (less secure but often works)
         try:
             model = OptimizedCNN(NUM_CLASSES)
-            if MODEL_PATH.endswith('_full.pt'):
+            if MODEL_PATH.endswith('_3050ti.pt'):
                 loaded_model = torch.load(MODEL_PATH, map_location='cpu', weights_only=False)
                 if isinstance(loaded_model, nn.Module):
                     model = loaded_model
