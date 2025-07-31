@@ -14,10 +14,6 @@ import pandas as pd
 # =============================================================================
 
 class OptimizedCNN(nn.Module):
-    """
-    IMPORTANT: This class definition MUST match exactly what you used during training!
-    Copy this from your training script to ensure compatibility.
-    """
     def __init__(self, K, dropout_rate=0.5):
         super(OptimizedCNN, self).__init__()
         
