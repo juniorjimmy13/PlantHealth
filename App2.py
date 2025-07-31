@@ -1,5 +1,5 @@
 # App.py - Complete Streamlit Plant Disease Classification App
-
+import time
 import streamlit as st
 import torch
 import torch.nn as nn
@@ -108,12 +108,10 @@ CLASS_NAMES = [
 # MODEL LOADING WITH MULTIPLE STRATEGIES
 # =============================================================================
 
+
 @st.cache_resource
 def load_model():
     """Load the trained model with multiple fallback strategies"""
-    
-    st.info("🔄 Loading model...")
-    
     # Strategy 1: Try with safe_globals
     try:
         model = OptimizedCNN(NUM_CLASSES)
@@ -130,8 +128,7 @@ def load_model():
                 state_dict = torch.load(MODEL_PATH, map_location='cpu')
                 model.load_state_dict(state_dict)
         
-        model.eval()
-        st.success("✅ Model loaded successfully with safe_globals!")
+        model.eval()       
         return model
         
     except Exception as e1:
@@ -151,6 +148,8 @@ def load_model():
                 model.load_state_dict(state_dict)
             
             model.eval()
+            global sv2
+            sv2 = True
             st.success("✅ Model loaded with weights_only=False!")
             st.warning("⚠️ Using less secure loading method. This is OK if you trust the model source.")
             return model
@@ -226,16 +225,15 @@ def main():
     st.markdown("Upload an image of a plant leaf to detect potential diseases using our AI model")
     
     # Sidebar info
-    with st.sidebar:
+    sidebar = st.sidebar
+    with sidebar:
         st.header("ℹ️ About")
         st.write(f"**Model Classes:** {NUM_CLASSES}")
         st.write(f"**PyTorch Version:** {torch.__version__}")
         st.write("**Model Architecture:** Optimized CNN")
-        
         if st.button("🔄 Reload Model"):
             st.cache_resource.clear()
             st.rerun()
-    
     # Load model
     model = load_model()
     if model is None:
@@ -270,8 +268,14 @@ def main():
         st.stop()
     
     # Model loaded successfully - show the app
+
+    with sidebar:
+        status = st.empty()
+        status.info("Loading the model... Please wait.",icon="⏳")
+        time.sleep(3)  # Simulate loading time
+        status.empty()
+        
     st.success(f"🎯 Model loaded! Ready to classify {NUM_CLASSES} different plant diseases.")
-    
     # File upload
     uploaded_file = st.file_uploader(
         "Choose a plant leaf image", 
