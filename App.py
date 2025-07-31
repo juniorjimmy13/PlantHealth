@@ -127,69 +127,80 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Your CNN Model Architecture
-class CNN(nn.Module):
-    def __init__(self, K):
-        super(CNN, self).__init__()
+class OptimizedCNN(nn.Module):
+    def __init__(self, K, dropout_rate=0.5):
+        super(OptimizedCNN, self).__init__()
+        
         self.conv_layers = nn.Sequential(
-            # conv1
-            nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1),
-            nn.ReLU(),
+            # Block 1 - Reduced channels for memory efficiency
+            nn.Conv2d(3, 32, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),  # inplace=True saves memory
             nn.BatchNorm2d(32),
-            nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1),
-            nn.ReLU(),
+            nn.Conv2d(32, 32, kernel_size=3, padding=1), 
+            nn.ReLU(inplace=True),
             nn.BatchNorm2d(32),
             nn.MaxPool2d(2),
-            # conv2
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1),
-            nn.ReLU(),
+            nn.Dropout2d(0.1),
+
+            # Block 2
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
             nn.BatchNorm2d(64),
-            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1),
-            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
             nn.BatchNorm2d(64),
             nn.MaxPool2d(2),
-            # conv3
-            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
-            nn.ReLU(),
+            nn.Dropout2d(0.1),
+
+            # Block 3
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
             nn.BatchNorm2d(128),
-            nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1),
-            nn.ReLU(),
+            nn.Conv2d(128, 128, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
             nn.BatchNorm2d(128),
             nn.MaxPool2d(2),
-            # conv4
-            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(256),
-            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(256),
+            nn.Dropout2d(0.2),
+
+            # Block 4 - Reduced from 256 to 192 for memory efficiency
+            nn.Conv2d(128, 192, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm2d(192),
+            nn.Conv2d(192, 192, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm2d(192),
             nn.MaxPool2d(2),
+            nn.Dropout2d(0.2),
+            
+            # Global Average Pooling instead of large fully connected layers
+            nn.AdaptiveAvgPool2d((1, 1))
         )
 
-        self.dense_layers = nn.Sequential(
-            nn.Dropout(0.4),
-            nn.Linear(50176, 1024),
-            nn.ReLU(),
-            nn.Dropout(0.4),
-            nn.Linear(1024, K),
+        # Smaller fully connected layers
+        self.classifier = nn.Sequential(
+            nn.Dropout(dropout_rate),
+            nn.Linear(192, 512),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm1d(512),
+            nn.Dropout(dropout_rate * 0.5),
+            nn.Linear(512, K)
         )
 
-    def forward(self, X):
-        out = self.conv_layers(X)
-        # Flatten
-        out = out.view(-1, 50176)
-        # Fully connected
-        out = self.dense_layers(out)
-        return out
+    def forward(self, x):
+        x = self.conv_layers(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x
 
 @st.cache_resource
-def load_model(model_path="PM.pt"):
+def load_model(model_path="tip.pt"):
     """Load the trained model with state dict"""
     try:
         # Create model architecture first (K=76 due to duplication in original training code)
-        model = CNN(K=76)
+        model = OptimizedCNN(K=38)
         
         # Load the state dictionary (weights)
-        state_dict = torch.load(model_path, map_location='cpu')
+        state_dict = torch.load(model_path, map_location='cpu',weights_only=False)
         model.load_state_dict(state_dict)
         model.eval()
         
@@ -252,7 +263,7 @@ def main():
         st.markdown("### Model Configuration")
         model_path = st.text_input(
             "Model Path", 
-            value="PM.pt",
+            value="tip.pt",
             help="Path to your trained PyTorch model file (.pt or .pth)"
         )
         
@@ -345,45 +356,44 @@ def main():
             # PyTorch ImageFolder sorts classes alphabetically by folder name
             # This should match the order our model was trained on
             class_names = [
-                "Apple_black_rot",           # 0
-                "Apple_cedar_apple_rust",    # 1  
-                "Apple_healthy",             # 2
-                "Apple_scab",                # 3
-                "Background_without_leaves", # 4
-                "Blueberry_healthy",         # 5
-                "Cherry_healthy",            # 6
-                "Cherry_powdery_mildew",     # 7
-                "Corn_common_rust",          # 8
-                "Corn_gray_leaf_spot",       # 9
-                "Corn_healthy",              # 10
-                "Corn_northern_leaf_blight", # 11
-                "Grape_black_measles",       # 12
-                "Grape_black_rot",           # 13
-                "Grape_healthy",             # 14
-                "Grape_leaf_blight",         # 15
-                "Orange_haunglongbing",      # 16
-                "Peach_bacterial_spot",      # 17
-                "Peach_healthy",             # 18
-                "Pepper_bacterial_spot",     # 19
-                "Pepper_healthy",            # 20
-                "Potato_early_blight",       # 21
-                "Potato_healthy",            # 22
-                "Potato_late_blight",        # 23
-                "Raspberry_healthy",         # 24
-                "Soybean_healthy",           # 25
-                "Squash_powdery_mildew",     # 26
-                "Strawberry_healthy",        # 27
-                "Strawberry_leaf_scorch",    # 28
-                "Tomato_bacterial_spot",     # 29
-                "Tomato_early_blight",       # 30
-                "Tomato_healthy",            # 31
-                "Tomato_late_blight",        # 32
-                "Tomato_leaf_mold",          # 33
-                "Tomato_mosaic_virus",       # 34
-                "Tomato_septoria_leaf_spot", # 35
-                "Tomato_spider_mites_two-spotted_spider_mite", # 36
-                "Tomato_target_spot",        # 37
-                "Tomato_yellow_leaf_curl_virus" # 38
+                'Apple___Apple_scab',                                    # 0
+                'Apple___Black_rot','Apple___Cedar_apple_rust',                              # 2
+                'Apple___healthy',                                       # 3
+                'Blueberry___healthy',                                   # 4
+                'Cherry_(including_sour)___Powdery_mildew',             # 5
+                'Cherry_(including_sour)___healthy',                     # 6
+                'Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot',   # 7
+                'Corn_(maize)___Common_rust_',                          # 8
+                'Corn_(maize)___Northern_Leaf_Blight',                  # 9
+                'Corn_(maize)___healthy',                               # 10
+                'Grape___Black_rot',                                     # 11
+                'Grape___Esca_(Black_Measles)',                         # 12
+                'Grape___Leaf_blight_(Isariopsis_Leaf_Spot)',          # 13
+                'Grape___healthy',                                       # 14
+                'Orange___Haunglongbing_(Citrus_greening)',             # 15
+                'Peach___Bacterial_spot',                               # 16
+                'Peach___healthy',                                       # 17
+                'Pepper,_bell___Bacterial_spot',                        # 18
+                'Pepper,_bell___healthy',                               # 19
+                'Potato___Early_blight',                                # 20
+                'Potato___Late_blight',                                 # 21
+                'Potato___healthy',                                     # 22
+                'Raspberry___healthy',                                  # 23
+                'Soybean___healthy',                                    # 24
+                'Squash___Powdery_mildew',                             # 25
+                'Strawberry___Leaf_scorch',                            # 26
+                'Strawberry___healthy',                                # 27
+                'Tomato___Bacterial_spot',                             # 28
+                'Tomato___Early_blight',                               # 29
+                'Tomato___Late_blight',                                # 30
+                'Tomato___Leaf_Mold',                                  # 31
+                'Tomato___Septoria_leaf_spot',                         # 32
+                'Tomato___Spider_mites Two-spotted_spider_mite',       # 33
+                'Tomato___Target_Spot',                                # 34
+                'Tomato___Tomato_Yellow_Leaf_Curl_Virus',              # 35
+                'Tomato___Tomato_mosaic_virus',                        # 36
+                'Tomato___healthy'                                                    # 1
+    
             ]
             
             # Safety check
