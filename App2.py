@@ -87,7 +87,7 @@ class OptimizedCNN(nn.Module):
 # =============================================================================
 
 # Update these with your actual values
-MODEL_PATH = "optimized_plant_model_3050ti.pt"  # Your model file path
+MODEL_PATH = "tip.pt"  # Your model file path
 NUM_CLASSES = 38  # Update with your actual number of classes
 
 # Update with your actual class names
