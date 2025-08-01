@@ -231,6 +231,18 @@ def main():
         st.write(f"**Model Classes:** {NUM_CLASSES}")
         st.write(f"**PyTorch Version:** {torch.__version__}")
         st.write("**Model Architecture:** Optimized CNN")
+        st.markdown("### Supported Plants")
+        st.markdown("""
+        - Tomato
+        - Potato  
+        - Corn
+        - Apple
+        - Bell Pepper
+        - Cherry
+        - Grape
+        - Peach
+        - Strawberry
+        """)
         
         if st.button("🔄 Reload Model"):
             st.cache_resource.clear()
