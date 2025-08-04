@@ -1,4 +1,4 @@
-# FIXED TRAINING CODE FOR RTX 3050 Ti
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -18,9 +18,9 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
-# === GPU SETUP AND VERIFICATION ===
+# === GPU SETUP===
 def setup_gpu():
-    """Proper GPU setup and verification"""
+    
     print("=== GPU SETUP ===")
     print(f"PyTorch version: {torch.__version__}")
     print(f"CUDA available: {torch.cuda.is_available()}")
@@ -45,7 +45,7 @@ def setup_gpu():
             except Exception as e:
                 print(f"  ❌ GPU {i} test failed: {e}")
         
-        # Optimize for consistent input sizes
+        
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.deterministic = False
         
@@ -66,7 +66,6 @@ def setup_gpu():
 device = setup_gpu()
 
 # === OPTIMIZED DATA LOADING ===
-# Determine optimal number of workers
 import psutil
 cpu_cores = psutil.cpu_count(logical=False)
 num_workers = min(cpu_cores, 8) if device.type == 'cuda' else 0
@@ -76,16 +75,17 @@ print(f"Using {num_workers} data loading workers")
 if device.type == 'cuda':
     # Check GPU memory to determine optimal batch size
     gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
-    if gpu_memory <= 4.5:  # 4GB variant
+    if gpu_memory <= 4.5:  # 4GB RTX 3050 Ti
         batch_size = 24
         print(f"4GB RTX 3050 Ti detected, using batch_size={batch_size}")
-    else:  # 6GB variant
+    else:  # 6GB
         batch_size = 32
         print(f"6GB RTX 3050 Ti detected, using batch_size={batch_size}")
 else:
     batch_size = 16  # Smaller batch for CPU
 
 # === IMAGE TRANSFORMS ===
+# ImageNet normalization values
 imagenet_mean = [0.485, 0.456, 0.406]
 imagenet_std = [0.229, 0.224, 0.225]
 
@@ -112,18 +112,17 @@ test_transform = transforms.Compose([
 ])
 
 # === DATASET LOADING WITH PROPER PATHS ===
-# Update these paths to your actual dataset paths
 train_path = "D:\\archive\\New Plant Diseases Dataset(Augmented)\\New Plant Diseases Dataset(Augmented)\\TrainSampled"
 valid_path = "D:\\archive\\New Plant Diseases Dataset(Augmented)\\New Plant Diseases Dataset(Augmented)\\ValidSampled"
 
 # Verify paths exist
 if not os.path.exists(train_path):
-    print(f"❌ Training path does not exist: {train_path}")
+    print(f"Training path does not exist: {train_path}")
     print("Please update the train_path variable with the correct path")
     exit(1)
 
 if not os.path.exists(valid_path):
-    print(f"❌ Validation path does not exist: {valid_path}")
+    print(f"Validation path does not exist: {valid_path}")
     print("Please update the valid_path variable with the correct path")
     exit(1)
 
@@ -131,7 +130,8 @@ if not os.path.exists(valid_path):
 train_dataset = datasets.ImageFolder(train_path, transform=train_transform)
 valid_dataset = datasets.ImageFolder(valid_path, transform=test_transform)
 
-# Optimized DataLoaders
+# Optimized DataLoaders, dataloaders work by loading data in parallel using multiple workers
+# and pinning memory for faster transfer to GPU
 train_loader = torch.utils.data.DataLoader(
     train_dataset, 
     batch_size=batch_size, 
@@ -155,13 +155,13 @@ print(f"Detected {num_classes} classes")
 print(f"Training samples: {len(train_dataset)}")
 print(f"Validation samples: {len(valid_dataset)}")
 
-# === MODEL DEFINITION (OPTIMIZED FOR RTX 3050 Ti) ===
+# === MODEL DEFINITION===
 class OptimizedCNN(nn.Module):
     def __init__(self, K, dropout_rate=0.5):
         super(OptimizedCNN, self).__init__()
         
         self.conv_layers = nn.Sequential(
-            # Block 1 - Reduced channels for memory efficiency
+            # Block 1 
             nn.Conv2d(3, 32, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),  # inplace=True saves memory
             nn.BatchNorm2d(32),
@@ -191,7 +191,7 @@ class OptimizedCNN(nn.Module):
             nn.MaxPool2d(2),
             nn.Dropout2d(0.2),
 
-            # Block 4 - Reduced from 256 to 192 for memory efficiency
+            # Block 4 - Deeper layers with more filters
             nn.Conv2d(128, 192, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(192),
@@ -238,9 +238,8 @@ print(f"Trainable parameters: {trainable_params:,}")
 from torch.cuda.amp import GradScaler, autocast
 
 def train_with_gpu_monitoring(model, criterion, train_loader, val_loader, epochs=20):
-    """Training with GPU monitoring and mixed precision"""
     
-    # Mixed precision for memory efficiency (RTX 3050 Ti supports this)
+    # Mixed precision for memory efficiency
     use_amp = device.type == 'cuda'
     scaler = GradScaler() if use_amp else None
     
